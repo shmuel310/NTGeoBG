@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>新約著作地理圖鑑</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600;700&family=Cinzel:wght@400;600&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink:       #1C1209;
+  --parch:     #F5EDD8;
+  --parch-mid: #EDE0C4;
+  --parch-dk:  #D5C5A1;
+  --gold:      #B8882A;
+  --gold-lt:   #D4AB52;
+  --rust:      #8B3A2A;
+  --rust-lt:   #C0614D;
+  --navy:      #1A2E4A;
+  --teal:      #2C5F62;
+  --panel:     #F9F4EA;
+
+  /* Era colours */
+  --era-0: #B8882A; /* 30–48 早期 */
+  --era-1: #C0614D; /* 48–57 書信期 */
+  --era-2: #2C5F62; /* 60–62 囚中書 */
+  --era-3: #5C4198; /* 62–70 晚期保羅 */
+  --era-4: #1A2E4A; /* 70–100 後期 */
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Noto Serif TC', Georgia, serif; background: var(--parch); color: var(--ink); overflow: hidden; }
+
+/* ── Layout ── */
+#app { display: flex; height: 100vh; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 320px;
+  min-width: 280px;
+  max-width: 360px;
+  background: var(--panel);
+  border-right: 1px solid var(--parch-dk);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 10;
+  box-shadow: 2px 0 12px rgba(0,0,0,.12);
+}
+
+#sidebar-header {
+  background: linear-gradient(135deg, var(--navy) 0%, #2C4A6E 100%);
+  padding: 20px 18px 16px;
+  flex-shrink: 0;
+}
+#sidebar-header h1 {
+  font-family: 'Cinzel', serif;
+  font-size: 15px;
+  letter-spacing: .12em;
+  color: var(--gold-lt);
+  line-height: 1.4;
+}
+#sidebar-header p {
+  font-size: 11px;
+  color: rgba(245,237,216,.6);
+  margin-top: 4px;
+  font-family: 'Noto Serif TC', serif;
+}
+
+/* Era filter tabs */
+#era-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--parch-mid);
+  border-bottom: 1px solid var(--parch-dk);
+  flex-shrink: 0;
+}
+.era-btn {
+  font-size: 10.5px;
+  padding: 4px 9px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  font-family: 'Noto Serif TC', serif;
+  transition: all .18s;
+  background: white;
+}
+.era-btn.active { color: white !important; border-color: transparent; }
+.era-btn:not(.active) { opacity: .65; }
+
+/* Layer toggles */
+#layer-toggles {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--parch);
+  border-bottom: 1px solid var(--parch-dk);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.layer-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--parch-dk);
+  cursor: pointer;
+  font-family: 'Noto Serif TC', serif;
+  background: var(--parch);
+  color: var(--ink);
+  transition: all .15s;
+}
+.layer-btn.on { background: var(--ink); color: var(--parch); border-color: var(--ink); }
+
+/* List */
+#book-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 6px 0;
+}
+.book-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background .15s, border-color .15s;
+  border-bottom: 1px solid rgba(0,0,0,.04);
+}
+.book-item:hover { background: var(--parch-mid); }
+.book-item.selected { background: var(--parch-dk); border-left-color: var(--gold); }
+.book-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.book-info { flex: 1; min-width: 0; }
+.book-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.book-meta {
+  font-size: 10.5px;
+  color: #7a6a50;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.book-date {
+  font-family: 'Cinzel', serif;
+  font-size: 10px;
+  color: var(--gold);
+  letter-spacing: .04em;
+  flex-shrink: 0;
+  padding-top: 3px;
+}
+
+/* Detail panel */
+#detail-panel {
+  background: white;
+  border-top: 1px solid var(--parch-dk);
+  padding: 14px 16px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #3a2e1c;
+  flex-shrink: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  display: none;
+}
+#detail-panel.visible { display: block; }
+#detail-panel h3 {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  color: var(--navy);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--parch-dk);
+}
+#detail-panel .dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; }
+#detail-panel .dl dt { font-weight: 600; color: var(--gold); white-space: nowrap; }
+#detail-panel .dl dd { color: var(--ink); }
+#detail-panel .desc { margin-top: 8px; color: #5a4a30; font-style: italic; font-family: 'EB Garamond', serif; font-size: 13px; }
+
+/* ── Map ── */
+#map { flex: 1; }
+
+/* Legend */
+#legend {
+  position: absolute;
+  bottom: 28px;
+  right: 12px;
+  background: rgba(249,244,234,.93);
+  border: 1px solid var(--parch-dk);
+  border-radius: 8px;
+  padding: 12px 14px;
+  z-index: 900;
+  font-size: 11px;
+  line-height: 1.8;
+  backdrop-filter: blur(4px);
+  min-width: 175px;
+}
+#legend h4 {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: var(--navy);
+  margin-bottom: 7px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--parch-dk);
+}
+.leg-row { display: flex; align-items: center; gap: 7px; }
+.leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.leg-sq { width: 14px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+.leg-label { color: var(--ink); }
+.leg-sep { border: none; border-top: 1px dashed var(--parch-dk); margin: 6px 0; }
+
+/* Custom markers */
+.city-label {
+  font-family: 'Noto Serif TC', serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--navy);
+  text-shadow: 0 1px 3px rgba(249,244,234,.9), 0 0 6px rgba(249,244,234,.9);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Leaflet popup override */
+.leaflet-popup-content-wrapper {
+  background: var(--panel);
+  border: 1px solid var(--parch-dk);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.18);
+  font-family: 'Noto Serif TC', serif;
+}
+.leaflet-popup-tip { background: var(--panel); }
+.popup-inner h3 {
+  font-family: 'Cinzel', serif;
+  font-size: 14px;
+  color: var(--navy);
+  margin-bottom: 6px;
+}
+.popup-inner .popup-name-zh {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.popup-inner table { width: 100%; font-size: 11.5px; border-collapse: collapse; margin-top: 6px; }
+.popup-inner td { padding: 3px 5px; border-bottom: 1px solid var(--parch-mid); vertical-align: top; }
+.popup-inner td:first-child { font-weight: 600; color: var(--gold); width: 65px; }
+.popup-inner .books-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.book-chip {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  color: white;
+  font-family: 'Cinzel', serif;
+  letter-spacing: .04em;
+}
+
+/* Responsive collapse for mobile */
+@media (max-width: 700px) {
+  #sidebar { width: 100%; max-width: 100%; height: 45vh; }
+  #app { flex-direction: column; }
+  #map { height: 55vh; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div id="sidebar-header">
+      <h1>新約著作地理圖鑑</h1>
+      <p>以地理為本的歷時性視覺化</p>
+    </div>
+    <div id="era-tabs"></div>
+    <div id="layer-toggles">
+      <button class="layer-btn on" data-layer="writing">書寫地點</button>
+      <button class="layer-btn on" data-layer="recipient">收信地點</button>
+      <button class="layer-btn on" data-layer="event">重要事件</button>
+      <button class="layer-btn on" data-layer="route">旅程路線</button>
+    </div>
+    <div id="book-list"></div>
+    <div id="detail-panel"></div>
+  </aside>
+  <div id="map"></div>
+</div>
+<div id="legend">
+  <h4>圖 例</h4>
+  <div class="leg-row"><span class="leg-dot" style="background:#B8882A"></span><span class="leg-label">主後 30–48 早期教會</span></div>
+  <div class="leg-row"><span class="leg-dot" style="background:#C0614D"></span><span class="leg-label">主後 48–57 保羅書信</span></div>
+  <div class="leg-row"><span class="leg-dot" style="background:#2C5F62"></span><span class="leg-label">主後 60–62 囚中書信</span></div>
+  <div class="leg-row"><span class="leg-dot" style="background:#5C4198"></span><span class="leg-label">主後 62–70 晚期保羅</span></div>
+  <div class="leg-row"><span class="leg-dot" style="background:#1A2E4A"></span><span class="leg-label">主後 70–100 後期著作</span></div>
+  <hr class="leg-sep">
+  <div class="leg-row"><span class="leg-dot" style="background:#B8882A;border:2px dashed white"></span><span class="leg-label">書寫地點</span></div>
+  <div class="leg-row"><span class="leg-dot" style="background:#2C5F62;border:2px dashed white"></span><span class="leg-label">收信地點</span></div>
+  <div class="leg-row"><span class="leg-dot" style="background:#e84393;width:10px;height:10px;border-radius:2px"></span><span class="leg-label">重要事件地點</span></div>
+  <hr class="leg-sep">
+  <div class="leg-row"><span class="leg-sq" style="background:#B8882A;opacity:.7"></span><span class="leg-label">宣教路線</span></div>
+</div>
+
+<script>
+// ── Era definitions ──
+const ERAS = [
+  { id: 'all',  label: '全部', color: '#555' },
+  { id: 'e0',   label: '30–48', color: '#B8882A' },
+  { id: 'e1',   label: '48–57', color: '#C0614D' },
+  { id: 'e2',   label: '60–62', color: '#2C5F62' },
+  { id: 'e3',   label: '62–70', color: '#5C4198' },
+  { id: 'e4',   label: '70–100', color: '#1A2E4A' },
+];
+
+// ── Cities ──
+const CITIES = {
+  jerusalem:    { latlng: [31.778, 35.235], zh: '耶路撒冷', en: 'Jerusalem' },
+  antioch_s:    { latlng: [36.204, 36.160], zh: '敘利亞安提阿', en: 'Antioch (Syria)' },
+  corinth:      { latlng: [37.906, 22.878], zh: '哥林多', en: 'Corinth' },
+  ephesus:      { latlng: [37.939, 27.341], zh: '以弗所', en: 'Ephesus' },
+  rome:         { latlng: [41.898, 12.476], zh: '羅馬', en: 'Rome' },
+  thessalonica: { latlng: [40.640, 22.940], zh: '帖撒羅尼迦', en: 'Thessalonica' },
+  philippi:     { latlng: [41.013, 24.288], zh: '腓立比', en: 'Philippi' },
+  galatia:      { latlng: [38.700, 32.500], zh: '加拉太', en: 'Galatia (region)' },
+  colossae:     { latlng: [37.780, 29.108], zh: '歌羅西', en: 'Colossae' },
+  laodicea:     { latlng: [37.834, 29.114], zh: '老底嘉', en: 'Laodicea' },
+  smyrna:       { latlng: [38.418, 27.128], zh: '士每拿', en: 'Smyrna' },
+  pergamum:     { latlng: [39.132, 27.184], zh: '別迦摩', en: 'Pergamum' },
+  thyatira:     { latlng: [38.921, 27.839], zh: '推雅推喇', en: 'Thyatira' },
+  sardis:       { latlng: [38.488, 28.038], zh: '撒狄', en: 'Sardis' },
+  philadelphia_as: { latlng: [38.349, 28.517], zh: '非拉鐵非', en: 'Philadelphia (Asia)' },
+  patmos:       { latlng: [37.320, 26.543], zh: '拔摩島', en: 'Patmos' },
+  caesarea:     { latlng: [32.502, 34.898], zh: '凱撒利亞', en: 'Caesarea Maritima' },
+  damascus:     { latlng: [33.510, 36.292], zh: '大馬士革', en: 'Damascus' },
+  alexandria:   { latlng: [31.200, 29.918], zh: '亞歷山大港', en: 'Alexandria' },
+  athens:       { latlng: [37.975, 23.735], zh: '雅典', en: 'Athens' },
+  troas:        { latlng: [39.759, 26.091], zh: '特羅亞', en: 'Troas' },
+  iconium:      { latlng: [37.874, 32.493], zh: '以哥念', en: 'Iconium' },
+  lystra:       { latlng: [37.567, 32.350], zh: '路司得', en: 'Lystra' },
+  antioch_p:    { latlng: [38.264, 31.125], zh: '彼西底安提阿', en: 'Pisidian Antioch' },
+  cyprus:       { latlng: [35.126, 33.430], zh: '塞浦路斯', en: 'Cyprus' },
+  macedonia:    { latlng: [41.000, 22.000], zh: '馬其頓（地區）', en: 'Macedonia' },
+  crete:        { latlng: [35.240, 24.810], zh: '克里特島', en: 'Crete' },
+  pontus:       { latlng: [41.000, 36.500], zh: '本都', en: 'Pontus' },
+  cappadocia:   { latlng: [38.650, 35.400], zh: '加帕多家', en: 'Cappadocia' },
+  bithynia:     { latlng: [40.500, 30.500], zh: '庇推尼', en: 'Bithynia' },
+  bethlehem:    { latlng: [31.705, 35.200], zh: '伯利恆', en: 'Bethlehem' },
+  nazareth:     { latlng: [32.701, 35.299], zh: '拿撒勒', en: 'Nazareth' },
+  capernaum:    { latlng: [32.881, 35.575], zh: '迦百農', en: 'Capernaum' },
+  galilee:      { latlng: [32.855, 35.526], zh: '加利利海', en: 'Sea of Galilee' },
+  jordan_r:     { latlng: [31.837, 35.546], zh: '約旦河（受洗處）', en: 'Jordan River' },
+  philemon_home:{ latlng: [37.780, 29.108], zh: '腓利門家（歌羅西）', en: 'Philemon\'s home' },
+  nicomedia:    { latlng: [40.763, 29.919], zh: '尼哥米底亞', en: 'Nicomedia' },
+  malta:        { latlng: [35.937, 14.375], zh: '馬耳他', en: 'Malta' },
+  nicopolis:    { latlng: [39.000, 20.730], zh: '尼哥坡里', en: 'Nicopolis' },
+  thyatira2:    { latlng: [38.921, 27.839], zh: '推雅推喇', en: 'Thyatira' },
+  egypt:        { latlng: [26.820, 30.802], zh: '埃及（逃亡）', en: 'Egypt' },
+};
+
+// ── Books ──
+const BOOKS = [
+  // 四福音
+  {
+    id: 'mark', name: '馬可福音', zh_full: '馬可福音', era: 'e4',
+    date: '約主後 65-70', category: '福音書',
+    writing: ['rome'],
+    recipient: null,
+    events: ['jerusalem','galilee','capernaum','jordan_r'],
+    desc: '最早成書的福音書，以耶穌在加利利的事工與進耶路撒冷為主軸。傳統認為書寫於羅馬，面向外邦讀者。',
+  },
+  {
+    id: 'matthew', name: '馬太福音', zh_full: '馬太福音', era: 'e4',
+    date: '約主後 80-90', category: '福音書',
+    writing: ['antioch_s'],
+    recipient: null,
+    events: ['bethlehem','egypt','nazareth','galilee','jerusalem'],
+    desc: '以猶太背景讀者為主，強調耶穌乃大衛後裔、是以賽亞所預言的彌賽亞。從伯利恆降生、逃往埃及，到加利利事工、最終進入耶路撒冷。',
+  },
+  {
+    id: 'luke', name: '路加福音', zh_full: '路加福音', era: 'e4',
+    date: '約主後 80-85', category: '福音書',
+    writing: ['caesarea'],
+    recipient: null,
+    events: ['bethlehem','nazareth','galilee','jerusalem'],
+    desc: '獻給提阿非羅的外邦讀者福音，特別強調「往耶路撒冷去」的旅程（9:51起），耶路撒冷是神學的目的地。',
+  },
+  {
+    id: 'john', name: '約翰福音', zh_full: '約翰福音', era: 'e4',
+    date: '約主後 90-100', category: '福音書',
+    writing: ['ephesus'],
+    recipient: null,
+    events: ['galilee','jerusalem','capernaum'],
+    desc: '傳統認為書寫於以弗所，約翰晚年所著。以「道」（Logos）神學為核心，記錄三次逾越節，頻繁往返加利利與耶路撒冷。',
+  },
+  // Acts
+  {
+    id: 'acts', name: '使徒行傳', zh_full: '使徒行傳', era: 'e4',
+    date: '約主後 80-85', category: '歷史書',
+    writing: ['rome'],
+    recipient: null,
+    events: ['jerusalem','antioch_s','cyprus','antioch_p','iconium','lystra','philippi','thessalonica','athens','corinth','ephesus','caesarea','malta','rome'],
+    desc: '路加所著，記錄教會從耶路撒冷向外擴張、保羅三次宣教旅程及被押解羅馬的歷史，是新約最重要的地理「路線圖」。',
+  },
+  // 早期書信
+  {
+    id: '1thess', name: '帖撒羅尼迦前書', zh_full: '帖撒羅尼迦前書', era: 'e1',
+    date: '約主後 50-51', category: '保羅書信',
+    writing: ['corinth'],
+    recipient: ['thessalonica'],
+    events: ['thessalonica'],
+    desc: '保羅最早的書信之一，從哥林多寫給剛建立的帖撒羅尼迦教會，回應其在逼迫中的信心與末世論的疑惑。',
+  },
+  {
+    id: '2thess', name: '帖撒羅尼迦後書', zh_full: '帖撒羅尼迦後書', era: 'e1',
+    date: '約主後 51', category: '保羅書信',
+    writing: ['corinth'],
+    recipient: ['thessalonica'],
+    events: ['thessalonica'],
+    desc: '緊接前書，糾正關於「主日已到」的誤解，宣告末世路線圖，並勸戒不肯做工者。',
+  },
+  {
+    id: 'gal', name: '加拉太書', zh_full: '加拉太書', era: 'e1',
+    date: '約主後 48-55（有爭議）', category: '保羅書信',
+    writing: ['antioch_s'],
+    recipient: ['galatia'],
+    events: ['antioch_p','iconium','lystra','jerusalem'],
+    desc: '保羅強力捍衛因信稱義，反駁猶太主義者的律法要求。收信教會為第一次宣教旅程中植立的加拉太諸城。',
+  },
+  {
+    id: '1cor', name: '哥林多前書', zh_full: '哥林多前書', era: 'e1',
+    date: '約主後 54-55', category: '保羅書信',
+    writing: ['ephesus'],
+    recipient: ['corinth'],
+    events: ['corinth'],
+    desc: '在以弗所第三次旅程期間寫就，處理哥林多教會的分裂、性道德、偶像祭物、恩賜、復活等多重問題。',
+  },
+  {
+    id: '2cor', name: '哥林多後書', zh_full: '哥林多後書', era: 'e1',
+    date: '約主後 55-56', category: '保羅書信',
+    writing: ['macedonia'],
+    recipient: ['corinth'],
+    events: ['corinth','troas'],
+    desc: '離開以弗所後在馬其頓寫成，既辯護使徒職分（對抗超級使徒），又為耶路撒冷籌款，並展示「瓦器」神學。',
+  },
+  {
+    id: 'rom', name: '羅馬書', zh_full: '羅馬書', era: 'e1',
+    date: '約主後 57', category: '保羅書信',
+    writing: ['corinth'],
+    recipient: ['rome'],
+    events: ['corinth','rome'],
+    desc: '第三次旅程末於哥林多所書，是保羅最系統的神學論著，奠定稱義、聖化、選民與萬民得救的宏偉救贖論。',
+  },
+  // 囚中書信
+  {
+    id: 'eph', name: '以弗所書', zh_full: '以弗所書', era: 'e2',
+    date: '約主後 60-62', category: '保羅囚中書信',
+    writing: ['rome'],
+    recipient: ['ephesus'],
+    events: ['ephesus'],
+    desc: '第一次羅馬被囚期間所書，建立最宏偉的教會論——教會作為基督身體、宇宙爭戰、屬靈全副軍裝。',
+  },
+  {
+    id: 'phil', name: '腓立比書', zh_full: '腓立比書', era: 'e2',
+    date: '約主後 60-62', category: '保羅囚中書信',
+    writing: ['rome'],
+    recipient: ['philippi'],
+    events: ['philippi'],
+    desc: '從羅馬監獄寫給深愛的腓立比教會，包含基督虛己頌（Kenosis Hymn）與「天上的國民」（politeuma）神學。',
+  },
+  {
+    id: 'col', name: '歌羅西書', zh_full: '歌羅西書', era: 'e2',
+    date: '約主後 60-62', category: '保羅囚中書信',
+    writing: ['rome'],
+    recipient: ['colossae'],
+    events: ['colossae'],
+    desc: '針對歌羅西教會異端（人為哲學、天使崇拜、飲食律例），宣告基督的宇宙性首位。',
+  },
+  {
+    id: 'phm', name: '腓利門書', zh_full: '腓利門書', era: 'e2',
+    date: '約主後 60-62', category: '保羅囚中書信',
+    writing: ['rome'],
+    recipient: ['colossae'],
+    events: ['colossae','rome'],
+    desc: '新約最短書信，保羅懇請奴隸主腓利門赦免並接回逃奴阿尼西母，是福音化解社會壁壘的縮影。',
+  },
+  // 晚期保羅
+  {
+    id: '1tim', name: '提摩太前書', zh_full: '提摩太前書', era: 'e3',
+    date: '約主後 62-65', category: '牧養書信',
+    writing: ['macedonia'],
+    recipient: ['ephesus'],
+    events: ['ephesus'],
+    desc: '傳統認為在第四次旅程時，從馬其頓寫給在以弗所牧會的提摩太，規範教會治理、長老執事、抵制異端。',
+  },
+  {
+    id: 'titus', name: '提多書', zh_full: '提多書', era: 'e3',
+    date: '約主後 63-65', category: '牧養書信',
+    writing: ['nicopolis'],
+    recipient: ['crete'],
+    events: ['crete'],
+    desc: '寫給在克里特島植堂的提多，指導設立長老、對付假教師，並強調行善的神學。',
+  },
+  {
+    id: '2tim', name: '提摩太後書', zh_full: '提摩太後書', era: 'e3',
+    date: '約主後 66-67', category: '牧養書信',
+    writing: ['rome'],
+    recipient: ['ephesus'],
+    events: ['troas','rome'],
+    desc: '保羅殉道前的「絕筆」，從羅馬第二次被囚寫出，呼籲提摩太恆忍事奉，提及特羅亞遺落的外衣與皮卷（4:13）。',
+  },
+  // 希伯來書
+  {
+    id: 'heb', name: '希伯來書', zh_full: '希伯來書', era: 'e3',
+    date: '約主後 60-90', category: '普通書信',
+    writing: ['rome'],
+    recipient: ['jerusalem'],
+    events: ['jerusalem'],
+    desc: '作者不確定，針對有退回猶太教傾向的信徒，以基督作為最高大祭司與完美獻祭為核心。',
+  },
+  // 大公書信
+  {
+    id: 'james', name: '雅各書', zh_full: '雅各書', era: 'e0',
+    date: '約主後 50-62', category: '大公書信',
+    writing: ['jerusalem'],
+    recipient: null,
+    events: ['jerusalem'],
+    desc: '耶穌的兄弟雅各所著，從耶路撒冷寫給散居各地的猶太基督徒，強調信心與行為並重的實踐神學。',
+  },
+  {
+    id: '1pet', name: '彼得前書', zh_full: '彼得前書', era: 'e3',
+    date: '約主後 63-65', category: '大公書信',
+    writing: ['rome'],
+    recipient: ['pontus','galatia','cappadocia','ephesus','bithynia'],
+    events: ['jerusalem','rome'],
+    desc: '從「巴比倫」（羅馬的隱語）寫給本都、加拉太、加帕多家、亞細亞、庇推尼的信徒，安慰受逼迫者，呼籲活出聖潔的客旅身份。',
+  },
+  {
+    id: '2pet', name: '彼得後書', zh_full: '彼得後書', era: 'e3',
+    date: '約主後 65-80', category: '大公書信',
+    writing: ['rome'],
+    recipient: null,
+    events: [],
+    desc: '警告假先知與末後的嘲笑者，強調聖經靈感與基督再來的確實性。',
+  },
+  {
+    id: '1john', name: '約翰一書', zh_full: '約翰一書', era: 'e4',
+    date: '約主後 90-100', category: '約翰書信',
+    writing: ['ephesus'],
+    recipient: ['ephesus'],
+    events: ['ephesus'],
+    desc: '以弗所周邊教會的神學宣言，針對初期諾斯底主義（幻影說），宣告道成肉身的真實性與愛的倫理。',
+  },
+  {
+    id: '2john', name: '約翰二書', zh_full: '約翰二書', era: 'e4',
+    date: '約主後 90-100', category: '約翰書信',
+    writing: ['ephesus'],
+    recipient: ['ephesus'],
+    events: [],
+    desc: '極短書信，警告不可接待否認基督道成肉身的人。',
+  },
+  {
+    id: '3john', name: '約翰三書', zh_full: '約翰三書', era: 'e4',
+    date: '約主後 90-100', category: '約翰書信',
+    writing: ['ephesus'],
+    recipient: null,
+    events: [],
+    desc: '寫給該猶，勸勉接待福音使者，批評獨攬大權的丟特腓。',
+  },
+  {
+    id: 'jude', name: '猶大書', zh_full: '猶大書', era: 'e3',
+    date: '約主後 65-80', category: '大公書信',
+    writing: ['jerusalem'],
+    recipient: null,
+    events: [],
+    desc: '耶穌的兄弟猶大所書，極力勸讀者「要為一次交付聖徒的真道竭力爭辯」，警告教內的詭詐假師傅。',
+  },
+  // 啟示錄
+  {
+    id: 'rev', name: '啟示錄', zh_full: '啟示錄', era: 'e4',
+    date: '約主後 95', category: '末世預言',
+    writing: ['patmos'],
+    recipient: ['ephesus','smyrna','pergamum','thyatira','sardis','philadelphia_as','laodicea'],
+    events: ['patmos','ephesus','smyrna','pergamum','thyatira','sardis','philadelphia_as','laodicea'],
+    desc: '約翰被流放於拔摩島時所得的異象，寫給亞細亞七個教會（按信使送遞的環形路線排列），以宏偉意象宣告基督的終末勝利。',
+  },
+];
+
+// ── Routes (宣教旅程) ──
+const ROUTES = [
+  {
+    id: 'journey1', label: '第一次宣教旅程（主後46-48）',
+    color: '#B8882A', weight: 2.5, dashArray: null,
+    cities: ['antioch_s','cyprus','antioch_p','iconium','lystra','antioch_p','antioch_s'],
+  },
+  {
+    id: 'journey2', label: '第二次宣教旅程（主後50-52）',
+    color: '#C0614D', weight: 2.5, dashArray: null,
+    cities: ['antioch_s','iconium','troas','philippi','thessalonica','athens','corinth','ephesus','antioch_s'],
+  },
+  {
+    id: 'journey3', label: '第三次宣教旅程（主後53-57）',
+    color: '#2C5F62', weight: 2.5, dashArray: null,
+    cities: ['antioch_s','ephesus','macedonia','corinth','troas','caesarea','jerusalem'],
+  },
+  {
+    id: 'rome_journey', label: '被押解往羅馬（主後57-60）',
+    color: '#5C4198', weight: 2, dashArray: '6,4',
+    cities: ['jerusalem','caesarea','malta','rome'],
+  },
+  {
+    id: 'rev_route', label: '啟示錄七教會路線',
+    color: '#1A2E4A', weight: 2, dashArray: '3,5',
+    cities: ['ephesus','smyrna','pergamum','thyatira','sardis','philadelphia_as','laodicea'],
+  },
+];
+
+// ── App state ──
+let activeEra = 'all';
+let activeLayers = { writing: true, recipient: true, event: true, route: true };
+let selectedBook = null;
+
+// ── Leaflet map ──
+const map = L.map('map', {
+  center: [37.5, 28],
+  zoom: 5,
+  minZoom: 3,
+  maxZoom: 12,
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+}).addTo(map);
+
+// ── Marker layers ──
+const layerGroups = {
+  writing:   L.layerGroup().addTo(map),
+  recipient: L.layerGroup().addTo(map),
+  event:     L.layerGroup().addTo(map),
+  route:     L.layerGroup().addTo(map),
+};
+
+// Helper: era color
+function eraColor(eraId) {
+  const e = ERAS.find(x => x.id === eraId);
+  return e ? e.color : '#888';
+}
+
+// Helper: create SVG circle marker
+function circleMarker(latlng, color, radius, dashOutline, opacity = 1) {
+  return L.circleMarker(latlng, {
+    radius,
+    fillColor: color,
+    fillOpacity: opacity * 0.85,
+    color: dashOutline ? '#fff' : color,
+    weight: dashOutline ? 2 : 1.5,
+    dashArray: dashOutline ? '4,2' : null,
+    opacity: opacity,
+  });
+}
+
+// ── Build popup ──
+function buildPopup(book) {
+  const color = eraColor(book.era);
+  const writingCities = (book.writing || []).map(c => CITIES[c]?.zh || c).join('、');
+  const recipCities = (book.recipient || []).map(c => CITIES[c]?.zh || c).join('、') || '—';
+
+  const chip = `<span class="book-chip" style="background:${color}">${book.name}</span>`;
+  return `
+    <div class="popup-inner" style="min-width:220px;max-width:280px">
+      <h3>${book.zh_full}</h3>
+      <div class="books-list">${chip}
+        <span class="book-chip" style="background:#7a6a50">${book.category}</span>
+      </div>
+      <table>
+        <tr><td>時期</td><td>${book.date}</td></tr>
+        <tr><td>書寫地</td><td>${writingCities || '—'}</td></tr>
+        <tr><td>收信地</td><td>${recipCities}</td></tr>
+      </table>
+      <p style="margin-top:8px;font-size:11.5px;color:#5a4a30;font-style:italic;font-family:'EB Garamond',serif;line-height:1.6">${book.desc}</p>
+    </div>`;
+}
+
+// ── Render markers ──
+function renderMarkers() {
+  // Clear all
+  Object.values(layerGroups).forEach(g => g.clearLayers());
+
+  const books = BOOKS.filter(b => activeEra === 'all' || b.era === activeEra);
+
+  // Draw routes first (under markers)
+  if (activeLayers.route) {
+    ROUTES.forEach(route => {
+      // Filter routes by era if needed — show all routes when era=all
+      const coords = route.cities.map(c => CITIES[c]?.latlng).filter(Boolean);
+      if (coords.length < 2) return;
+      const line = L.polyline(coords, {
+        color: route.color,
+        weight: route.weight,
+        opacity: 0.65,
+        dashArray: route.dashArray,
+        lineJoin: 'round',
+        lineCap: 'round',
+      });
+      line.bindTooltip(route.label, { sticky: true, className: 'city-label' });
+      layerGroups.route.addLayer(line);
+    });
+  }
+
+  // Collect city → books mapping
+  const writingMap = {}, recipMap = {}, eventMap = {};
+  books.forEach(book => {
+    (book.writing || []).forEach(c => {
+      writingMap[c] = writingMap[c] || [];
+      writingMap[c].push(book);
+    });
+    (book.recipient || []).forEach(c => {
+      recipMap[c] = recipMap[c] || [];
+      recipMap[c].push(book);
+    });
+    (book.events || []).forEach(c => {
+      eventMap[c] = eventMap[c] || [];
+      eventMap[c].push(book);
+    });
+  });
+
+  // Writing markers
+  if (activeLayers.writing) {
+    Object.entries(writingMap).forEach(([cityId, bks]) => {
+      const city = CITIES[cityId]; if (!city) return;
+      // If multiple books, use blended — use first book color, offset
+      bks.forEach((book, i) => {
+        const color = eraColor(book.era);
+        const offset = bks.length > 1 ? [i * 0.04 - 0.02, i * 0.04 - 0.02] : [0, 0];
+        const ll = [city.latlng[0] + offset[0], city.latlng[1] + offset[1]];
+        const m = circleMarker(ll, color, 9, true);
+        m.bindPopup(buildPopup(book), { maxWidth: 300 });
+        m.bindTooltip(`📝 ${book.name} — 書寫地：${city.zh}`, { sticky: true });
+        m.on('click', () => selectBook(book.id));
+        layerGroups.writing.addLayer(m);
+      });
+    });
+  }
+
+  // Recipient markers
+  if (activeLayers.recipient) {
+    Object.entries(recipMap).forEach(([cityId, bks]) => {
+      const city = CITIES[cityId]; if (!city) return;
+      bks.forEach((book, i) => {
+        const color = eraColor(book.era);
+        const offset = bks.length > 1 ? [-i * 0.05 + 0.02, -i * 0.05 + 0.02] : [0, 0];
+        const ll = [city.latlng[0] + offset[0], city.latlng[1] + offset[1]];
+        const m = L.circleMarker(ll, {
+          radius: 8,
+          fillColor: '#F5EDD8',
+          fillOpacity: 0.9,
+          color: color,
+          weight: 2.5,
+        });
+        m.bindPopup(buildPopup(book), { maxWidth: 300 });
+        m.bindTooltip(`✉️ ${book.name} — 收信地：${city.zh}`, { sticky: true });
+        m.on('click', () => selectBook(book.id));
+        layerGroups.recipient.addLayer(m);
+      });
+    });
+  }
+
+  // Event markers (squares via divIcon)
+  if (activeLayers.event) {
+    Object.entries(eventMap).forEach(([cityId, bks]) => {
+      const city = CITIES[cityId]; if (!city) return;
+      // Show city label as divIcon
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="background:#e84393;width:8px;height:8px;border-radius:2px;border:1.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>`,
+        iconSize: [8, 8],
+        iconAnchor: [4, 4],
+      });
+      const m = L.marker(city.latlng, { icon });
+      const bookNames = [...new Set(bks.map(b => b.name))].join('、');
+      m.bindTooltip(`📍 ${city.zh}（${bookNames}）`, { sticky: true });
+      layerGroups.event.addLayer(m);
+
+      // City name label
+      const labelIcon = L.divIcon({
+        className: 'city-label',
+        html: city.zh,
+        iconAnchor: [-6, 8],
+      });
+      const label = L.marker(city.latlng, { icon: labelIcon, interactive: false });
+      layerGroups.event.addLayer(label);
+    });
+  }
+}
+
+// ── Select book ──
+function selectBook(bookId) {
+  selectedBook = bookId;
+  document.querySelectorAll('.book-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === bookId);
+  });
+  const book = BOOKS.find(b => b.id === bookId);
+  if (!book) return;
+  showDetail(book);
+
+  // Fly to first relevant city
+  const firstCity = (book.writing || [])[0] || (book.recipient || [])[0] || (book.events || [])[0];
+  if (firstCity && CITIES[firstCity]) {
+    map.flyTo(CITIES[firstCity].latlng, 7, { duration: 1 });
+  }
+}
+
+function showDetail(book) {
+  const panel = document.getElementById('detail-panel');
+  const color = eraColor(book.era);
+  const writingCities = (book.writing || []).map(c => CITIES[c]?.zh || c).join('、') || '—';
+  const recipCities = (book.recipient || []).map(c => CITIES[c]?.zh || c).join('、') || '—';
+  const eventCities = (book.events || []).map(c => CITIES[c]?.zh || c).join('、') || '—';
+
+  panel.innerHTML = `
+    <h3 style="border-bottom-color:${color}">${book.zh_full} <small style="font-family:sans-serif;font-size:10px;color:${color};font-weight:400">${book.date}</small></h3>
+    <div class="dl">
+      <dt>類別</dt><dd>${book.category}</dd>
+      <dt>書寫地</dt><dd>${writingCities}</dd>
+      <dt>收信地</dt><dd>${recipCities}</dd>
+      <dt>事件地</dt><dd>${eventCities}</dd>
+    </div>
+    <p class="desc">${book.desc}</p>`;
+  panel.classList.add('visible');
+}
+
+// ── Build sidebar ──
+function buildSidebar() {
+  // Era tabs
+  const tabsEl = document.getElementById('era-tabs');
+  ERAS.forEach(era => {
+    const btn = document.createElement('button');
+    btn.className = 'era-btn' + (era.id === 'all' ? ' active' : '');
+    btn.textContent = era.label;
+    btn.style.color = era.id === 'all' ? '#333' : era.color;
+    btn.style.borderColor = era.color;
+    if (era.id === 'all' && activeEra === 'all') {
+      btn.style.background = '#333'; btn.style.color = 'white';
+    }
+    btn.addEventListener('click', () => {
+      activeEra = era.id;
+      document.querySelectorAll('.era-btn').forEach(b => {
+        b.classList.remove('active');
+        const e = ERAS.find(x => x.label === b.textContent);
+        if (e) { b.style.background = 'white'; b.style.color = e.color; }
+      });
+      btn.classList.add('active');
+      btn.style.background = era.color; btn.style.color = 'white';
+      buildBookList();
+      renderMarkers();
+    });
+    tabsEl.appendChild(btn);
+  });
+
+  // Layer toggles
+  document.querySelectorAll('.layer-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const layer = btn.dataset.layer;
+      activeLayers[layer] = !activeLayers[layer];
+      btn.classList.toggle('on', activeLayers[layer]);
+      renderMarkers();
+    });
+  });
+
+  buildBookList();
+}
+
+// ── Build book list ──
+const CATEGORIES = ['福音書','歷史書','保羅書信','保羅囚中書信','牧養書信','大公書信','約翰書信','末世預言'];
+
+function buildBookList() {
+  const listEl = document.getElementById('book-list');
+  listEl.innerHTML = '';
+  const filtered = BOOKS.filter(b => activeEra === 'all' || b.era === activeEra);
+
+  const byCat = {};
+  filtered.forEach(b => {
+    byCat[b.category] = byCat[b.category] || [];
+    byCat[b.category].push(b);
+  });
+
+  CATEGORIES.forEach(cat => {
+    const books = byCat[cat];
+    if (!books || books.length === 0) return;
+
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:6px 14px 3px;font-size:10px;letter-spacing:.1em;color:#9a8560;font-family:Cinzel,serif;text-transform:uppercase;border-top:1px solid #e8dfc8;margin-top:4px;';
+    header.textContent = cat;
+    listEl.appendChild(header);
+
+    books.forEach(book => {
+      const item = document.createElement('div');
+      item.className = 'book-item';
+      item.dataset.id = book.id;
+      const color = eraColor(book.era);
+
+      item.innerHTML = `
+        <span class="book-dot" style="background:${color}"></span>
+        <div class="book-info">
+          <div class="book-name">${book.name}</div>
+          <div class="book-meta">${(book.writing || []).map(c => CITIES[c]?.zh || c).join('') || ''}${book.writing?.length && book.recipient?.length ? ' → ' : ''}${(book.recipient || []).map(c => CITIES[c]?.zh || c).join('、') || ''}</div>
+        </div>
+        <div class="book-date">${book.date.replace('約主後 ', '').replace('約主後', '')}</div>`;
+
+      item.addEventListener('click', () => selectBook(book.id));
+      listEl.appendChild(item);
+    });
+  });
+}
+
+// ── Init ──
+buildSidebar();
+renderMarkers();
+</script>
+</body>
+</html>
