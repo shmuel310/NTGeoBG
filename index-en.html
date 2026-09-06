@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Testament Interactive Geography Map — NT Geography Explorer</title>
+  
+  <!-- Leaflet.js Mapping Library (OpenStreetMap & CARTO) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Classical Scholarly Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@300;400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Noto+Sans+TC:wght@300;400;500;700&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Custom Brand Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── HEADER ─────────────────────── -->
+  <header>
+    <div class="header-top">
+      <div class="title-area">
+        <div class="brand-badge">Biblical Digital Humanities · OpenStreetMap</div>
+        <h1>NT Interactive Geography Map <em>New Testament Spatial & Temporal Explorer</em></h1>
+        <p>Geographically anchored interactive visualization of the Four Gospels, Acts missionary journeys, Pauline epistles transmission vectors, Revelation seven churches postal circuit, and diachronic chronology.</p>
+      </div>
+      
+      <div class="header-actions">
+        <button id="basemap-toggle-btn" class="btn-pill" data-mode="osm">🗺️ OpenStreetMap</button>
+        <button id="lang-toggle-btn" class="btn-pill">🌐 中文 (繁體)</button>
+      </div>
+    </div>
+
+    <!-- About & Scholarly Historical Notes (Accordion) -->
+    <details class="about-details">
+      <summary>📜 About this Tool & Scholarly Historical Notes ↓</summary>
+      <div class="about-content">
+        <p><strong>Methodological Principles & Scholarly Positions:</strong></p>
+        <ul style="padding-left: 20px; margin-top: 6px;">
+          <li><strong>Chronology and Authorship Debates:</strong> Composition dates and locations for several books remain active discussions in contemporary NT scholarship (e.g., South vs. North Galatian theories, Pauline authorship of the Pastorals, 2 Peter, and the author of Hebrews). This tool adopts the widely accepted scholarly consensus and traditional historical provenance while annotating alternative perspectives in the dossiers.</li>
+          <li><strong>Archaeological Corroboration:</strong> Geographic pins are anchored in verified archaeological excavations, including the famous Corinthian Erastus Inscription (Rom 16:23), Gallio’s Bema (Acts 18:12), the Grand Theater of Ephesus (Acts 19:29), and the Pontic royal tombs.</li>
+          <li><strong>Brand Color Language:</strong> Styled strictly in Charcoal (#2B2B2B), Warm White (#F5F3EE), Antique Gold (#C8A96A), Slate Blue (#4A5D73), Ivory (#EAE6DC), and Amber (#D6A84C) to evoke ancient vellum manuscripts through clean modern cartography.</li>
+        </ul>
+      </div>
+    </details>
+  </header>
+
+  <!-- ── VIEW TABS BAR ─────────────────── -->
+  <nav class="view-nav-bar">
+    <div class="view-tabs">
+      <button class="vtab-btn active" data-view="timeline">
+        <span>🕰️ Diachronic Timeline</span>
+        <span class="vtab-badge">30–100 AD</span>
+      </button>
+      <button class="vtab-btn" data-view="gospels">
+        <span>📖 Four Gospels Routes</span>
+        <span class="vtab-badge">4 Books</span>
+      </button>
+      <button class="vtab-btn" data-view="acts">
+        <span>⛵ Acts Missionary Journeys</span>
+        <span class="vtab-badge">4 Journeys</span>
+      </button>
+      <button class="vtab-btn" data-view="epistles">
+        <span>✉️ Pauline Epistles Network</span>
+        <span class="vtab-badge">13 Letters</span>
+      </button>
+      <button class="vtab-btn" data-view="revelation">
+        <span>👑 Revelation 7 Churches</span>
+        <span class="vtab-badge">220km</span>
+      </button>
+      <button class="vtab-btn" data-view="general">
+        <span>🕊️ General Epistles & Hebrews</span>
+        <span class="vtab-badge">7 Books</span>
+      </button>
+      <button class="vtab-btn" data-view="matrix">
+        <span>📊 Master 27 Books Matrix</span>
+        <span class="vtab-badge">Overview</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── TIMELINE STRIP ────────── -->
+  <div class="timeline-strip">
+    <div class="timeline-inner">
+      <div class="timeline-label">Historical Eras:</div>
+      <div class="era-buttons">
+        <button class="era-btn active" data-index="0">Era 1: Church Inception (30–48)</button>
+        <button class="era-btn" data-index="1">Era 2: Early Epistles (48–52)</button>
+        <button class="era-btn" data-index="2">Era 3: Peak Missionary (53–57)</button>
+        <button class="era-btn" data-index="3">Era 4: 1st Imprisonment (60–62)</button>
+        <button class="era-btn" data-index="4">Era 5: Post-Release (62–67)</button>
+        <button class="era-btn" data-index="5">Era 6: Jewish War (65–75)</button>
+        <button class="era-btn" data-index="6">Era 7: Johannine Era (80–100)</button>
+      </div>
+      <div id="era-info-chip" class="era-info-chip">
+        <strong>30–48 AD</strong> · Church Inception & Expansion
+      </div>
+    </div>
+  </div>
+
+  <!-- ── APP CONTAINER ─────────────────── -->
+  <main class="app-container">
+    
+    <!-- Leaflet Map Container -->
+    <div id="map-container">
+      <div id="map"></div>
+      
+      <!-- Floating Filter Card -->
+      <div class="map-floating-overlay">
+        <div id="map-floating-card" class="quick-filter-card">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Side Detail Drawer -->
+    <aside id="detail-drawer" class="detail-drawer">
+      <div class="drawer-header">
+        <div>
+          <div id="drawer-tag" class="drawer-tag">Region / Category</div>
+          <h2 id="drawer-title" class="drawer-title">Biblical City / Book</h2>
+          <div id="drawer-subtitle" class="drawer-subtitle">Ancient Greek Name · Date</div>
+        </div>
+        <button id="drawer-close-btn" class="drawer-close" title="Close Drawer">✕</button>
+      </div>
+      
+      <div id="drawer-body" class="drawer-body">
+        <!-- Populated dynamically by app.js -->
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- ── MASTER MATRIX VIEW ─────── -->
+  <section id="matrix-view-wrap" class="matrix-container">
+    <div class="matrix-toolbar">
+      <div>
+        <h2 style="font-family:var(--font-serif);color:var(--brand-antique-gold);font-size:24px;">New Testament 27 Books Spatial-Temporal Matrix</h2>
+        <p style="font-size:13px;color:var(--brand-ivory);opacity:0.85;margin-top:2px;">Click any book row to fly directly to its composition and recipient locations, and inspect full historical dossiers.</p>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div class="quick-pills">
+          <button class="qp-btn mq-pill active" data-cat="all">All (27)</button>
+          <button class="qp-btn mq-pill" data-cat="福音書">Gospels (4)</button>
+          <button class="qp-btn mq-pill" data-cat="歷史書">Historical (1)</button>
+          <button class="qp-btn mq-pill" data-cat="保羅書信">Pauline (13)</button>
+          <button class="qp-btn mq-pill" data-cat="大公書信">General (8)</button>
+          <button class="qp-btn mq-pill" data-cat="啟示文學">Apocalyptic (1)</button>
+        </div>
+        <input type="text" id="matrix-search" class="matrix-search-input" placeholder="🔍 Search book, city, or recipient...">
+      </div>
+    </div>
+
+    <div class="matrix-table-wrap">
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Book Name</th>
+            <th>Canonical Category</th>
+            <th>Date (AD)</th>
+            <th>Written At</th>
+            <th>Recipient / Church</th>
+            <th>Map Action</th>
+          </tr>
+        </thead>
+        <tbody id="matrix-tbody">
+          <!-- Populated dynamically by app.js -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ───────────────────────── -->
+  <footer>
+    <div class="footer-inner">
+      <div>
+        <span>NT Interactive Geography Map © Biblical Digital Humanities Project</span>
+        <span style="margin:0 8px;opacity:0.4;">|</span>
+        <span>Map data provided by OpenStreetMap (© OpenStreetMap contributors)</span>
+      </div>
+      <div>
+        <span>Brand Palette: Charcoal #2B2B2B · Warm White #F5F3EE · Antique Gold #C8A96A · Slate Blue #4A5D73 · Ivory #EAE6DC · Amber #D6A84C</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/data.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
